@@ -37,7 +37,7 @@ import com.project.spring.security.login.security.services.UserDetailsImpl;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired    
+    @Autowired
     AuthenticationManager authenticationManager;
 
     @Autowired
@@ -53,10 +53,11 @@ public class AuthController {
     JwtUtils jwtUtils;
 
     @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest){
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
 
         Authentication authentication = authenticationManager
-                        .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+                .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(),
+                        loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
@@ -65,20 +66,19 @@ public class AuthController {
         ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
 
         List<String> roles = userDetails.getAuthorities().stream()
-        .map(item -> item.getAuthority())
-        .collect(Collectors.toList());
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
 
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-        .body(new UserInfoResponse(
-                                userDetails.getId(),
-                                userDetails.getUsername(),
-                                userDetails.getEmail(),
-                                roles)
-                            );
+                .body(new UserInfoResponse(
+                        userDetails.getId(),
+                        userDetails.getUsername(),
+                        userDetails.getEmail(),
+                        roles));
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest){
+    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
 
         if (userRepository.existsByUsername(signUpRequest.getUsername())) {
             return ResponseEntity.badRequest().body(new MessageResponse("Erro: Usuário já existe"));
@@ -88,49 +88,59 @@ public class AuthController {
             return ResponseEntity.badRequest().body(new MessageResponse("Erro: Este email já foi registrado"));
         }
 
-        //Criando uma nova conta de usuário
+        // Criando uma nova conta de usuário
         User user = new User(signUpRequest.getUsername(),
-                            signUpRequest.getEmail(),
-                            encoder.encode(signUpRequest.getPassword()));
+                signUpRequest.getEmail(),
+                encoder.encode(signUpRequest.getPassword()));
 
         Set<String> strRoles = signUpRequest.getRole();
-        
+
         Set<Role> roles = new HashSet<>();
 
-        if(strRoles == null){
+        if (strRoles == null) {
             Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-            .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
+                    .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
             roles.add(userRole);
-        }else {
+        } else {
             strRoles.forEach(role -> {
                 switch (role) {
-                case "admin":
-                    Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                        .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
-                    roles.add(adminRole);
-                    break;
-                default:
-                    Role userRole = roleRepository.findByName(ERole.ROLE_USER)
-                        .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
+
+                    case "admin":
+                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
+                                .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
+                        roles.add(adminRole);
+                        break;
+
+                    case "premium":
+                        Role modRole = roleRepository.findByName(ERole.ROLE_PREMIUM)
+                                .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
+                        roles.add(modRole);
+                        break;
+
+                    case "user":
+                        Role userRole = roleRepository.findByName(ERole.ROLE_USER)
+                                .orElseThrow(() -> new RuntimeException("Erro: Role não encontrada"));
                         roles.add(userRole);
-                    }
+                        break;
+                    default:
+                        throw new RuntimeException("Erro: Role não encontrada");
                 }
-            );
+            });
         }
-        
+
         user.setRoles(roles);
-        
-        //salvando no banco
+
+        // salvando no banco
         userRepository.save(user);
-        
+
         return ResponseEntity.ok(new MessageResponse("Usuário registrado com sucesso"));
     }
 
     @PostMapping("/signout")
-    public ResponseEntity<?> logoutUser(){
+    public ResponseEntity<?> logoutUser() {
         ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
-                        .body(new MessageResponse("Sessão encerrada"));
+                .body(new MessageResponse("Sessão encerrada"));
     }
-    
+
 }
